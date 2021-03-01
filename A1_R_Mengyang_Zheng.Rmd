@@ -1,0 +1,387 @@
+---
+output:
+  html_document: default
+  pdf_document: default
+---
+***Mengyang Zheng HW 1 3/1/2021***
+
+**Exercise 1 Missing Data**
+
+```{r}
+rm(list=ls())
+setwd("~/GitHub/Econ613/Assignments/A1/dat")
+
+datstu <- read.csv("~/GitHub/Econ613/Assignments/A1/dat/datstu.csv", stringsAsFactors=TRUE)
+datsss <- read.csv("~/GitHub/Econ613/Assignments/A1/dat/datsss.csv", stringsAsFactors=TRUE)
+datjss <- read.csv("~/GitHub/Econ613/Assignments/A1/dat/datjss.csv", stringsAsFactors=TRUE)
+```
+
+
+```{r}
+#Number of students
+nrow(datstu)
+```
+
+```{r}
+#Number of schools in datstu:640
+#Number of shcools in datsss:898
+library(tidyr)
+length(unique(unlist(na.omit(datstu[5:10][datstu[5:10]!=""]))))
+length(unique(datsss[,c("schoolcode")]))
+```
+
+```{r}
+#Number of programs
+length(unique(unlist(datstu[11:16][datstu[11:16]!=""])))
+```
+
+```{r}
+#Number of choices
+library(stringr)
+#If you use the paste command then straight count the unique choices you would get 3086 choices, however, I found this incorrect as paste would make NA real string characters and will generate cases where if missing schoolcode, then it becomes NA+program or missing program it becomes program+NA, where I think they are invalid choices, so I need to take those choices out.
+
+datstu$choice1=str_c(datstu$schoolcode1," ",datstu$choicepgm1)
+datstu$choice2=str_c(datstu$schoolcode2," ",datstu$choicepgm2)
+datstu$choice3=str_c(datstu$schoolcode3," ",datstu$choicepgm3)
+datstu$choice4=str_c(datstu$schoolcode4," ",datstu$choicepgm4)
+datstu$choice5=str_c(datstu$schoolcode5," ",datstu$choicepgm5)
+datstu$choice6=str_c(datstu$schoolcode6," ",datstu$choicepgm6)
+
+#Idea is to find choices that have leading blank space or blank space that is in last place of the string after concat 2 columns then it must be an invalid choice.
+
+datstu$STest1=grepl('^ ',datstu$choice1)
+datstu$ETest1=grepl(' $',datstu$choice1)
+datstu$choice1[datstu$STest1==TRUE | datstu$ETest1==TRUE]<-NA
+datstu$STest2=grepl('^ ',datstu$choice2)
+datstu$ETest2=grepl(' $',datstu$choice2)
+datstu$choice2[datstu$STest2==TRUE | datstu$ETest2==TRUE]<-NA
+datstu$STest3=grepl('^ ',datstu$choice3)
+datstu$ETest3=grepl(' $',datstu$choice3)
+datstu$choice3[datstu$STest3==TRUE | datstu$ETest3==TRUE]<-NA
+datstu$STest4=grepl('^ ',datstu$choice4)
+datstu$ETest4=grepl(' $',datstu$choice4)
+datstu$choice4[datstu$STest4==TRUE | datstu$ETest4==TRUE]<-NA
+datstu$STest5=grepl('^ ',datstu$choice5)
+datstu$ETest5=grepl(' $',datstu$choice5)
+datstu$choice5[datstu$STest5==TRUE | datstu$ETest5==TRUE]<-NA
+datstu$STest6=grepl('^ ',datstu$choice6)
+datstu$ETest6=grepl(' $',datstu$choice6)
+datstu$choice6[datstu$STest6==TRUE | datstu$ETest6==TRUE]<-NA
+datstu$STest1=NULL
+datstu$ETest1=NULL
+datstu$STest2=NULL
+datstu$ETest2=NULL
+datstu$STest3=NULL
+datstu$ETest3=NULL
+datstu$STest4=NULL
+datstu$ETest4=NULL
+datstu$STest5=NULL
+datstu$ETest5=NULL
+datstu$STest6=NULL
+datstu$ETest6=NULL
+length(unique(unlist(datstu[19:24]),na.rm=TRUE))
+```
+
+```{r}
+#Missing test score
+sum(is.na(datstu$score))
+```
+
+```{r}
+#Apply to the same school(different program)
+for (i in 1:nrow(datstu)){
+datstu$sameschool[i]=length(unique(na.omit(unlist(datstu[i,5:10]))))
+}
+
+sum(datstu$sameschool<6-rowSums(is.na(datstu[5:10])))
+datstu$sameschool=NULL
+```
+
+```{r}
+#Apply to less than 6 choices
+datstu$Applynum=6-rowSums(is.na(datstu[19:24]))
+sum(datstu$Applynum<6)
+datstu$Applynum=NULL
+```
+
+**Exercise 2: Data**
+```{r}
+#Reshape using gather
+library(dplyr)
+library(tidyverse)
+library(reshape2)
+
+dat_school=dplyr::select(datstu,X,choice1:choice6)
+datjss$X = NULL
+datsss$X = NULL
+dat_school=gather(dat_school,'key','value',-X)
+
+#Merge datstu and datjss
+dat_merge=merge(datstu,datjss,by="jssdistrict")
+
+#Merge using X as merge ID
+#dat_school is the dataset for all students (admited and non-admited)
+dat_school=merge(dat_school,dat_merge,by="X")
+
+
+#Drop irrelevant variables
+dat_school$choice1 = NULL
+dat_school$choice2 = NULL
+dat_school$choice3 = NULL
+dat_school$choice4 = NULL
+dat_school$choice5 = NULL
+dat_school$choice6 = NULL
+
+dat_school$schoolcode1 = NULL
+dat_school$schoolcode2 = NULL
+dat_school$schoolcode3 = NULL
+dat_school$schoolcode4 = NULL
+dat_school$schoolcode5 = NULL
+dat_school$schoolcode6 = NULL
+
+dat_school$choicepgm1 = NULL
+dat_school$choicepgm2 = NULL
+dat_school$choicepgm3 = NULL
+dat_school$choicepgm4 = NULL
+dat_school$choicepgm5 = NULL
+dat_school$choicepgm6 = NULL
+
+#Split the school code and program value column
+dat_school=cbind(dat_school,colsplit(dat_school$value," ",c("schoolcode", "program")))
+
+
+#clean sss data and merge
+datsss=datsss[!duplicated(datsss$schoolcode), ]
+dat_school=merge(dat_school,datsss,by="schoolcode")
+
+#Keep all choices that students are admitted
+dat_school$key[dat_school$key=="choice1"]<-1
+dat_school$key[dat_school$key=="choice2"]<-2
+dat_school$key[dat_school$key=="choice3"]<-3
+dat_school$key[dat_school$key=="choice4"]<-4
+dat_school$key[dat_school$key=="choice5"]<-5
+dat_school$key[dat_school$key=="choice6"]<-6
+
+names(dat_school)[names(dat_school)=="key"] <- "rankedchoice"
+#If choice number meets with the rankplace number, then the student is admitted
+#You can treat dat_school as student choice level data now
+dat_admitted=subset(dat_school,rankedchoice==rankplace)
+
+dat_school_level=dat_admitted
+#Use group method to find cutoff, quality, and size.
+dat_school_level=dat_school_level %>%
+                    group_by(value) %>%
+                    mutate(cutoff=min(score,na.rm=TRUE))
+
+dat_school_level=dat_school_level %>%
+                    group_by(value) %>%
+                    mutate(quality=mean(score,na.rm=TRUE)) 
+
+dat_school_level=dat_school_level %>%
+                    group_by(value) %>%
+                    mutate(size=n())
+
+dat_school_level=dat_school_level[!duplicated(dat_school_level$value),]
+dat_school_level=dat_school_level[c("schoolcode","program","schoolname","cutoff","quality","size","sssdistrict","ssslong","ssslat")]
+
+head(dat_school_level,20)
+```
+
+**Exercise 3: Distance**
+```{r}
+#calculate distance between junior high and senior high for all admitted and non-admitted students and for all of their choices.
+
+dat_school$distance=sqrt((69.172*(dat_school$ssslong-dat_school$point_x)*cos(dat_school$point_y/57.3))^2+(69.172*(dat_school$ssslat-dat_school$point_y))^2)
+
+#This is for Exercise 4
+dat_admitted$distance=sqrt((69.172*(dat_admitted$ssslong-dat_admitted$point_x)*cos(dat_admitted$point_y/57.3))^2+(69.172*(dat_admitted$ssslat-dat_admitted$point_y))^2)
+
+head(dat_school$distance,20)
+```
+**Exercise 4: Descriptive Characteristics**
+```{r}
+#merge choice level and school level data then we can compute all ranked choices mean and sd for relevant variables
+dat_school_level_core=dat_school_level[c("schoolcode","program","cutoff","quality")]
+
+dat_choice=merge(dat_school,dat_school_level_core,"value"=paste("schoolcode","program"))
+
+Descriptive=dat_choice %>%
+  group_by(rankedchoice) %>%
+  summarise(mean_cutoff=mean(cutoff),
+       sd_cutoff=sd(cutoff),
+       mean_quality=mean(quality),
+       sd_quality=sd(quality),
+       mean_distance=mean(distance),
+            sd_distance=sd(distance))
+
+head(Descriptive)
+  
+```
+
+```{r}
+#Divide each choice into 4 quantiles by student scores
+dat_choice$quantiles=ntile(dat_choice$score,4)
+Descriptive2=dat_choice %>%
+  group_by(rankedchoice,quantiles) %>%
+    summarise(mean_cutoff=mean(cutoff),
+       sd_cutoff=sd(cutoff),
+       mean_quality=mean(quality),
+       sd_quality=sd(quality),
+       mean_distance=mean(distance),
+            sd_distance=sd(distance))
+Descriptive2=drop_na(Descriptive2)
+head(Descriptive2,24)
+```
+
+**Exercise 5: Data Creation**
+```{r}
+rm(list=ls())
+set.seed(0)
+X1=runif(10000,min=1,max=3)
+X2=rgamma(10000,shape=3,scale=2)
+X3=rbinom(10000,size=1,prob=0.3)
+E=rnorm(10000,mean=2,sd=1)
+Y=0.5+1.2*X1-0.9*X2+0.1*X3+E
+
+ydum=rep(0,10000)
+
+# Loop over 10000 entries, if satisfied, replace 0 with 1
+for (j in 1:10000){
+  if (Y[j]>mean(Y)){
+    ydum[j]=1
+  }
+}
+
+head(ydum,20)
+```
+
+**Exercise 6: OLS**
+```{r}
+cor(Y, X1)
+#largely different from 1.2, only 0.208
+X=as.matrix(cbind(1,X1,X2,X3))
+beta=solve(t(X)%*%X)%*%t(X)%*%Y
+beta # beta are 1.22,-0.9, and 0.069
+SigmaSq=sum((Y-X%*%beta)^2)/(nrow(X)-ncol(X))
+Var=SigmaSq*solve(t(X)%*%X)
+SE=sqrt(diag(Var))
+SE #SE for each beta is 0.0173,0.0029, 0.0219
+```
+
+**Exercise 7: Discrete Choice**
+```{r}
+#This is the result from package use
+X_all=as.data.frame(cbind(ydum,X1,X2,X3))
+probit=glm(ydum~X1+X2+X3,data=X_all,family=binomial(link="probit"))
+summary(probit)
+```
+```{r}
+#Now we compute using optim function
+probit_log<-function(x,y,beta){
+  prob <- pnorm(x %*% beta)
+  -sum((1-y)*log(1-prob)+y*log(prob))
+}
+
+probit_gr <- function(x,y,beta){
+  prob <- pnorm(x %*% beta)
+  grad <- dnorm(x %*% beta)*(y-prob)/(prob*(1-prob))
+  -crossprod(x,grad)
+}
+
+
+X0=as.matrix(cbind(1,X1,X2,X3))
+Y0=as.matrix(ydum)
+probit0 <- optim(par=c(0.1,0.1,0.1,0.1),probit_log,y=Y0,x=X0,gr=probit_gr, method="BFGS", hessian=TRUE)
+
+probit0$par
+#Same as the one we use the package to solve for, which means this is correct.
+```
+
+```{r}
+#Package result for logit model
+logit=glm(ydum~X1+X2+X3,data=X_all,family=binomial(link="logit"))
+summary(logit)
+```
+```{r}
+#Computation by optim
+logit_exp<-function(x,y,beta){
+  -sum(y*(x %*% beta - log(1+exp(x %*% beta)))
+    + (1-y)*(-log(1 + exp(x %*% beta))))
+}
+
+logit0 <- optim(par=c(0.1,0.1,0.1,0.1),logit_exp,y=Y0,x=X0, method="BFGS", hessian=TRUE)
+logit0$par
+#Same as the result coming from the package so it must be correct.
+```
+
+
+```{r}
+linear=lm(ydum~X1+X2+X3,data=X_all)
+summary(linear)
+```
+
+```{r}
+#The sign of coefficients of X1,X2, and X3 are consistent across three models. X1 and X3 turns out to be positive and X2 is negative. However, the maginitude of the probit and the linear model coefficients are relatively close to each other but the coefficients of the logit model are almost twice of the above two models. Coefficients of X1 and X2 are both significant across probit, logit, and linear models. However, the coefficient of X3 is insignificant in linear model but significant in both probit and logit models.
+
+```
+
+**Exercise 8: Marginal Effects**
+```{r}
+library(mfx)
+```
+```{r}
+#Use Package to get numbers but I have the code for how to get the results, I just want to make sure they show the exact same results.
+probitmfx(ydum~X1+X2+X3,data=X_all,atmean=FALSE)
+```
+
+```{r}
+#Use Package to get numbers so we can double check later
+logitmfx(ydum~X1+X2+X3,data=X_all,atmean=FALSE)
+```
+```{r}
+#Use class Code to compute the probit marginal effect, same as package ones
+#Recall X0=as.matrix(cbind(1,X1,X2,X3))
+marg_probit=as.matrix(mean(dnorm(X0 %*% probit0$par))*probit0$par)
+marg_probit
+```
+```{r}
+#Use class Code to compute the logit marginal effect, same as package ones
+marg1_logit=as.matrix(mean(dnorm(X0 %*% logit0$par))*logit0$par)
+marg1_logit
+```
+```{r}
+#Use library code from mfx to compute the probit SE
+xm=as.matrix(colMeans(X_all))
+be=as.matrix(probit0$par)
+k1=length(probit0$par)
+xb=t(xm) %*% be
+vcv=solve(probit0$hessian)
+gr = apply(cbind(1,X1,X2,X3), 1, function(x){
+  as.numeric(as.numeric(dnorm(x %*% be))*(diag(k1) - as.numeric(x %*% be)*(be %*% t(x))))
+    })
+gr = matrix(apply(gr,1,mean),nrow=k1)
+
+SE_probit_marg = sqrt(diag(gr %*% vcv %*% t(gr)))
+SE_probit_marg
+#Same as package results
+```
+        
+
+```{r}
+#Use library code from mfx to compute the logit SE
+xm=as.matrix(colMeans(X_all))
+be=as.matrix(logit0$par)
+k1=length(logit0$par)
+xb=t(xm) %*% be
+vcv=solve(logit0$hessian)
+gr = apply(cbind(1,X1,X2,X3), 1, function(x){
+      as.numeric(as.numeric(plogis(x %*% be)*(1-plogis(x %*% be)))*
+                   (diag(k1) - (1 - 2*as.numeric(plogis(x %*% be)))*(be %*% t(x))))
+    })  
+    gr = matrix(apply(gr,1,mean),nrow=k1)
+SE_logit_marg = sqrt(diag(gr %*% vcv %*% t(gr)))
+
+SE_logit_marg
+#Same as package results
+```
+
